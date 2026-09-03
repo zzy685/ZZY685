@@ -1,9 +1,10 @@
-## Hi there 👋
+##  一个自我介绍：
+我是广东工业大学24级计科8班的张志远，目前是大三。暑假实习时才第一次注册github账号，感觉算是最晚一批使用这个东西的人了。爱好广泛，会看电竞比赛，篮球比赛，足球比赛，田径比赛，马拉松和箱根比赛，还会去读一些历史资料和地理杂志，也算得上是爱好广泛了，小时候就想着遇到谁都可以聊两句，现在也算勉强做到了，希望以后的人生还能继续学到新的知识和交到更多的朋友。
 
 <!--
 **zzy685/ZZY685** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
 
-Here are some ideas to get you started:
+Here are some ideas toHi there get you started:
 
 - 🔭 I’m currently working on ...
 - 🌱 I’m currently learning ...
