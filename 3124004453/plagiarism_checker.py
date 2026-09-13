@@ -1,0 +1,195 @@
+# -*- coding: utf-8 -*-
+"""
+论文查重核心模块
+提供文本预处理、分词、相似度计算等功能
+"""
+
+import re
+import math
+from collections import Counter
+from typing import List, Tuple
+
+try:
+    import jieba
+    JIEBA_AVAILABLE = True
+except ImportError:
+    JIEBA_AVAILABLE = False
+
+
+# 中文标点符号集合
+PUNCTUATION = set(
+    '，。！？、；：""''（）【】《》—…·'
+    ',.!?;:()[]{}<>-_\'\"`~@#$%^&*+=|\\/'
+    '\n\r\t '
+)
+
+
+def clean_text(text: str) -> str:
+    """
+    文本预处理：去除标点符号、空白字符，统一为小写
+    """
+    # 去除所有标点和空白
+    cleaned = ''.join(ch for ch in text if ch not in PUNCTUATION)
+    return cleaned.lower()
+
+
+def segment_words(text: str) -> List[str]:
+    """
+    对文本进行分词
+    优先使用jieba分词，若不可用则退化为单字分词
+    """
+    cleaned = clean_text(text)
+    if not cleaned:
+        return []
+
+    if JIEBA_AVAILABLE:
+        # 使用jieba精确模式分词
+        words = list(jieba.cut(cleaned, cut_all=False))
+        # 过滤空字符串
+        words = [w for w in words if w.strip()]
+        return words
+    else:
+        # 退化为单字分词
+        return list(cleaned)
+
+
+def get_char_ngrams(text: str, n: int = 2) -> List[str]:
+    """
+    获取字符级n-gram列表
+    """
+    cleaned = clean_text(text)
+    if len(cleaned) < n:
+        return [cleaned] if cleaned else []
+    return [cleaned[i:i + n] for i in range(len(cleaned) - n + 1)]
+
+
+def cosine_similarity(vec1: Counter, vec2: Counter) -> float:
+    """
+    计算两个词频向量的余弦相似度
+    优化：在一次遍历中同时计算点积和模长，减少遍历次数
+    """
+    if not vec1 or not vec2:
+        return 0.0
+
+    # 选择较短的向量进行遍历，减少循环次数
+    if len(vec1) > len(vec2):
+        vec1, vec2 = vec2, vec1
+
+    dot_product = 0.0
+    norm1_sq = 0.0
+    norm2_sq = 0.0
+
+    # 一次遍历计算点积和vec1的模长
+    for key, val in vec1.items():
+        norm1_sq += val * val
+        if key in vec2:
+            dot_product += val * vec2[key]
+
+    # 计算vec2的模长
+    for val in vec2.values():
+        norm2_sq += val * val
+
+    norm1 = math.sqrt(norm1_sq)
+    norm2 = math.sqrt(norm2_sq)
+
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+
+    return dot_product / (norm1 * norm2)
+
+
+def jaccard_similarity(set1: set, set2: set) -> float:
+    """
+    计算两个集合的Jaccard相似度
+    """
+    if not set1 and not set2:
+        return 1.0
+    if not set1 or not set2:
+        return 0.0
+    intersection = len(set1 & set2)
+    union = len(set1 | set2)
+    return intersection / union if union > 0 else 0.0
+
+
+def word_level_similarity(text1: str, text2: str) -> float:
+    """
+    词级相似度：分词后计算词频向量的余弦相似度
+    """
+    words1 = segment_words(text1)
+    words2 = segment_words(text2)
+
+    vec1 = Counter(words1)
+    vec2 = Counter(words2)
+
+    return cosine_similarity(vec1, vec2)
+
+
+def ngram_level_similarity(text1: str, text2: str, n: int = 2) -> float:
+    """
+    n-gram级相似度：字符级n-gram的余弦相似度
+    """
+    ngrams1 = get_char_ngrams(text1, n)
+    ngrams2 = get_char_ngrams(text2, n)
+
+    vec1 = Counter(ngrams1)
+    vec2 = Counter(ngrams2)
+
+    return cosine_similarity(vec1, vec2)
+
+
+def _segment_words_cleaned(cleaned: str) -> List[str]:
+    """对已预处理的文本进行分词（内部函数，避免重复clean_text）"""
+    if not cleaned:
+        return []
+    if JIEBA_AVAILABLE:
+        words = list(jieba.cut(cleaned, cut_all=False))
+        return [w for w in words if w.strip()]
+    return list(cleaned)
+
+
+def _get_char_ngrams_cleaned(cleaned: str, n: int = 2) -> List[str]:
+    """对已预处理的文本生成n-gram（内部函数，避免重复clean_text）"""
+    if len(cleaned) < n:
+        return [cleaned] if cleaned else []
+    return [cleaned[i:i + n] for i in range(len(cleaned) - n + 1)]
+
+
+def calculate_similarity(orig_text: str, plagiarized_text: str) -> float:
+    """
+    综合计算两篇论文的重复率
+    采用词级余弦相似度与字符级bigram相似度加权平均
+
+    参数:
+        orig_text: 原文文本
+        plagiarized_text: 抄袭版论文文本
+
+    返回:
+        重复率（0.0 ~ 1.0之间的浮点数）
+    """
+    if not orig_text.strip() or not plagiarized_text.strip():
+        return 0.0
+
+    # 统一预处理一次，避免在词级和n-gram计算中重复调用clean_text
+    cleaned1 = clean_text(orig_text)
+    cleaned2 = clean_text(plagiarized_text)
+
+    if not cleaned1 or not cleaned2:
+        return 0.0
+
+    # 词级相似度（权重0.6）
+    words1 = _segment_words_cleaned(cleaned1)
+    words2 = _segment_words_cleaned(cleaned2)
+    word_sim = cosine_similarity(Counter(words1), Counter(words2))
+
+    # 字符级bigram相似度（权重0.4）
+    ngrams1 = _get_char_ngrams_cleaned(cleaned1, n=2)
+    ngrams2 = _get_char_ngrams_cleaned(cleaned2, n=2)
+    bigram_sim = cosine_similarity(Counter(ngrams1), Counter(ngrams2))
+
+    # 加权综合
+    final_similarity = 0.6 * word_sim + 0.4 * bigram_sim
+
+    # 确保在[0, 1]范围内
+    final_similarity = max(0.0, min(1.0, final_similarity))
+
+    return final_similarity
