@@ -4,10 +4,9 @@
 提供文本预处理、分词、相似度计算等功能
 """
 
-import re
 import math
 from collections import Counter
-from typing import List, Tuple
+from typing import List
 
 try:
     import jieba
@@ -28,7 +27,6 @@ def clean_text(text: str) -> str:
     """
     文本预处理：去除标点符号、空白字符，统一为小写
     """
-    # 去除所有标点和空白
     cleaned = ''.join(ch for ch in text if ch not in PUNCTUATION)
     return cleaned.lower()
 
@@ -43,13 +41,10 @@ def segment_words(text: str) -> List[str]:
         return []
 
     if JIEBA_AVAILABLE:
-        # 使用jieba精确模式分词
         words = list(jieba.cut(cleaned, cut_all=False))
-        # 过滤空字符串
         words = [w for w in words if w.strip()]
         return words
     else:
-        # 退化为单字分词
         return list(cleaned)
 
 
@@ -71,7 +66,6 @@ def cosine_similarity(vec1: Counter, vec2: Counter) -> float:
     if not vec1 or not vec2:
         return 0.0
 
-    # 选择较短的向量进行遍历，减少循环次数
     if len(vec1) > len(vec2):
         vec1, vec2 = vec2, vec1
 
@@ -79,13 +73,11 @@ def cosine_similarity(vec1: Counter, vec2: Counter) -> float:
     norm1_sq = 0.0
     norm2_sq = 0.0
 
-    # 一次遍历计算点积和vec1的模长
     for key, val in vec1.items():
         norm1_sq += val * val
         if key in vec2:
             dot_product += val * vec2[key]
 
-    # 计算vec2的模长
     for val in vec2.values():
         norm2_sq += val * val
 
