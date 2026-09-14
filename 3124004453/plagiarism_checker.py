@@ -5,6 +5,8 @@
 """
 
 import math
+import re
+from html.parser import HTMLParser
 from collections import Counter
 from typing import List
 
@@ -13,6 +15,48 @@ try:
     JIEBA_AVAILABLE = True
 except ImportError:
     JIEBA_AVAILABLE = False
+
+
+class _HTMLTextExtractor(HTMLParser):
+    """从HTML中提取纯文本的解析器"""
+    def __init__(self):
+        super().__init__()
+        self._text_parts = []
+        self._skip = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ('script', 'style', 'head', 'noscript'):
+            self._skip = True
+
+    def handle_endtag(self, tag):
+        if tag in ('script', 'style', 'head', 'noscript'):
+            self._skip = False
+
+    def handle_data(self, data):
+        if not self._skip:
+            self._text_parts.append(data)
+
+    def get_text(self) -> str:
+        return ''.join(self._text_parts)
+
+
+def extract_text_from_html(html: str) -> str:
+    """
+    从HTML内容中提取纯文本
+    如果输入不是HTML，则原样返回
+    """
+    if not html:
+        return html
+    # 简单检测是否是HTML
+    if not re.search(r'<!DOCTYPE\s+html|<html[\s>]', html, re.IGNORECASE):
+        return html
+    try:
+        parser = _HTMLTextExtractor()
+        parser.feed(html)
+        parser.close()
+        return parser.get_text()
+    except Exception:
+        return html
 
 
 # 中文标点符号集合
@@ -160,6 +204,10 @@ def calculate_similarity(orig_text: str, plagiarized_text: str) -> float:
     """
     if not orig_text.strip() or not plagiarized_text.strip():
         return 0.0
+
+    # 提取HTML纯文本（处理从网页保存的测试文件）
+    orig_text = extract_text_from_html(orig_text)
+    plagiarized_text = extract_text_from_html(plagiarized_text)
 
     # 统一预处理一次，避免在词级和n-gram计算中重复调用clean_text
     cleaned1 = clean_text(orig_text)
